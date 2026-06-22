@@ -46,10 +46,6 @@ npm run dist:mac   # macOS用 (.dmg) ※macOS上での実行が必要
 - **Windows**: 「Windows によって PC が保護されました」(Microsoft Defender SmartScreen)と表示された場合、「詳細情報」→「実行」を選択してください。
 - **macOS**: 「開発元が未確認のため開けません」と表示された場合、Finderでアプリを右クリック(またはControl+クリック)→「開く」を選択してください。初回のみこの操作が必要です。
 
-## GitHub Actions による自動ビルド・リリース
-
-`main` ブランチへのpushをトリガーに、Windows / macOS 向けインストーラーをビルドし、GitHubのReleasesへ自動公開する設定が `.github/workflows/release.yml` に入っています。リリースバージョンは `package.json` の `version` を基準にするため、新しいリリースを作る際はバージョンを更新してください。
-
 ## ライセンス
 
 MIT License © 2026 ymb (詳細は [LICENSE](LICENSE) を参照)
