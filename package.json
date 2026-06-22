@@ -1,0 +1,54 @@
+{
+  "name": "ejs-html-sync",
+  "productName": "YMB EJS差分同期ツール",
+  "version": "0.1.0",
+  "description": "公開後に直接編集されたHTMLの差分をEJSソースへ反映するツール",
+  "main": "main.js",
+  "private": true,
+  "author": "ymb",
+  "license": "MIT",
+  "homepage": "https://github.com/yumebi/ymb_ejs_synch",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yumebi/ymb_ejs_synch.git"
+  },
+  "scripts": {
+    "start": "electron .",
+    "build-icons": "node scripts/build-icons.js",
+    "dist": "electron-builder",
+    "dist:win": "electron-builder --win",
+    "dist:mac": "electron-builder --mac"
+  },
+  "dependencies": {
+    "diff": "^5.2.0"
+  },
+  "devDependencies": {
+    "electron": "^42.0.0",
+    "electron-builder": "^26.0.0",
+    "png2icons": "^2.0.1",
+    "sharp": "^0.35.2"
+  },
+  "build": {
+    "appId": "com.ymb.ejs-html-sync",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "renderer/**/*",
+      "src/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": "nsis"
+    },
+    "mac": {
+      "target": "dmg",
+      "category": "public.app-category.developer-tools"
+    },
+    "linux": {
+      "target": "AppImage"
+    }
+  }
+}

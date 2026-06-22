@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>YMB EJS差分同期ツール</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="toolbar">
+    <div class="field">
+      <label>EJSソースルート</label>
+      <input id="ejsRoot" type="text" placeholder="例: C:\projects\sample-site\src\ejs">
+      <button id="pickEjsRoot">選択…</button>
+    </div>
+    <div class="field">
+      <label>公開HTMLルート</label>
+      <input id="htmlRoot" type="text" placeholder="例: C:\projects\sample-site\dist">
+      <button id="pickHtmlRoot">選択…</button>
+    </div>
+    <div class="field">
+      <label>対象サブディレクトリ(空欄=全体)</label>
+      <input id="scope" type="text" placeholder="ABOUT">
+    </div>
+    <button id="runScan" class="primary">スキャン実行</button>
+    <span id="scanStatus" class="status"></span>
+  </header>
+
+  <main class="layout">
+    <section class="page-list">
+      <table>
+        <thead>
+          <tr><th>ページ</th><th>状態</th><th>自動</th><th>要レビュー</th></tr>
+        </thead>
+        <tbody id="pageListBody"></tbody>
+      </table>
+    </section>
+
+    <section class="detail" id="detail">
+      <p class="placeholder">左の一覧からページを選択してください。</p>
+    </section>
+  </main>
+
+  <footer class="appbar">
+    <span id="versionInfo" class="version"></span>
+    <button id="checkUpdateBtn">最新バージョン確認</button>
+    <span id="updateResult" class="status"></span>
+    <label class="theme-toggle">
+      <input type="checkbox" id="themeToggle">
+      ダークモード
+    </label>
+  </footer>
+
+  <script src="renderer.js"></script>
+</body>
+</html>
