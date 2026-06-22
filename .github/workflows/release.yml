@@ -10,6 +10,7 @@ permissions:
 jobs:
   build:
     strategy:
+      max-parallel: 1
       matrix:
         os: [windows-latest, macos-latest]
     runs-on: ${{ matrix.os }}
