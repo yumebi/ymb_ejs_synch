@@ -30,26 +30,25 @@ npm start
 3. 「スキャン実行」
 4. ページ一覧から確認したいページを選択 → 自動反映可能な差分は一括適用、要レビューの差分は内容を確認して個別に適用
 
-## インストーラーのビルド
+## 技術スタック
 
-```bash
-npm run dist:win   # Windows用 (.exe インストーラー)
-npm run dist:mac   # macOS用 (.dmg) ※macOS上での実行が必要
-```
+| 用途 | ライブラリ/ツール |
+|---|---|
+| フレームワーク | [Electron](https://www.electronjs.org/) v42 |
+| 差分計算 | [diff](https://github.com/kpdecker/jsdiff) |
+| ビルドツール | [electron-builder](https://www.electron.build/) v26 |
+| CI/CD | GitHub Actions |
 
-成果物は `dist/` に出力されます。
+## ダウンロード
 
-## ⚠️ インストール時に警告が表示されます
+[Releases](https://github.com/yumebi/ymb_ejs_synch/releases) からインストーラーをダウンロードしてください。
+`main` ブランチへのpushをトリガーに、GitHub Actionsが自動でWindows / macOS向けインストーラーをビルドし公開します。
 
-このアプリは個人配布用で、コード署名(証明書による発行者署名)を行っていません。そのため、インストーラーやアプリ起動時にOSから警告が表示されます。これは悪意のあるソフトという意味ではなく、署名コストをかけていない未署名アプリに対する標準的な警告です。
-
-- **Windows**: 「Windows によって PC が保護されました」(Microsoft Defender SmartScreen)と表示された場合、「詳細情報」→「実行」を選択してください。
-- **macOS**: 「開発元が未確認のため開けません」と表示された場合、Finderでアプリを右クリック(またはControl+クリック)→「開く」を選択してください。初回のみこの操作が必要です。
-
-## GitHub Actions による自動ビルド・リリース
-
-`main` ブランチへのpushをトリガーに、Windows / macOS 向けインストーラーをビルドし、GitHubのReleasesへ自動公開する設定が `.github/workflows/release.yml` に入っています。リリースバージョンは `package.json` の `version` を基準にするため、新しいリリースを作る際はバージョンを更新してください。
+> **インストール時に警告が表示される場合があります。** このアプリは個人配布用で、コード署名(証明書による発行者署名)を行っていません。
+> これは悪意のあるソフトという意味ではなく、署名コストをかけていない未署名アプリに対する標準的な警告です。
+> - **Windows**: 「Windows によって PC が保護されました」(Microsoft Defender SmartScreen)と表示された場合、「詳細情報」→「実行」を選択してください。
+> - **macOS**: 「開発元が未確認のため開けません」と表示された場合、Finderでアプリを右クリック(またはControl+クリック)→「開く」を選択してください。初回のみこの操作が必要です。
 
 ## ライセンス
 
-MIT License © 2026 ymb (詳細は [LICENSE](LICENSE) を参照)
+[MIT License](LICENSE) © 2026 ymb
