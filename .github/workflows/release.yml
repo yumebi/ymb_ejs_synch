@@ -10,7 +10,6 @@ permissions:
 jobs:
   build:
     strategy:
-      max-parallel: 1
       matrix:
         os: [windows-latest, macos-latest]
     runs-on: ${{ matrix.os }}
@@ -20,16 +19,34 @@ jobs:
         with:
           node-version: 20
       - run: npm ci
-      - run: npx electron-builder --publish always
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - if: matrix.os == 'windows-latest'
+        run: npx electron-builder --win
+      - if: matrix.os == 'macos-latest'
+        run: npx electron-builder --mac
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist-${{ matrix.os }}
+          path: |
+            dist/*.exe
+            dist/*.exe.blockmap
+            dist/*.dmg
+            dist/*.dmg.blockmap
+            dist/latest*.yml
+          if-no-files-found: ignore
 
-  publish-release:
+  release:
     needs: build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: draftを公開releaseにする
-        run: gh release edit "v$(node -p "require('./package.json').version")" --draft=false
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - id: pkg
+        run: echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.pkg.outputs.version }}
+          files: artifacts/**/*
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
