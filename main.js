@@ -4,9 +4,50 @@ const path = require('path');
 const scanner = require('./src/core/scanner');
 const patcher = require('./src/core/patcher');
 
+const UPDATE_REPO = 'yumebi/ymb_ejs_synch';
+const RELEASES_URL = `https://github.com/${UPDATE_REPO}/releases`;
+
 let mainWindow;
 let lastPages = [];
 const patchIndex = new Map(); // patchId -> { patch, page }
+
+function parseVersion(v) {
+  return String(v).replace(/^v/, '').split('.').map((n) => parseInt(n, 10) || 0);
+}
+
+function isNewer(a, b) {
+  for (let i = 0; i < Math.max(a.length, b.length); i++) {
+    const diff = (a[i] || 0) - (b[i] || 0);
+    if (diff !== 0) return diff > 0;
+  }
+  return false;
+}
+
+async function checkForUpdateOnStartup() {
+  try {
+    const res = await fetch(`https://api.github.com/repos/${UPDATE_REPO}/releases/latest`);
+    if (!res.ok) return;
+    const data = await res.json();
+    const latest = parseVersion(data.tag_name || '0.0.0');
+    const current = parseVersion(app.getVersion());
+    if (!isNewer(latest, current)) return;
+
+    const result = await dialog.showMessageBox(mainWindow, {
+      type: 'info',
+      title: '新しいバージョンがあります',
+      message: `新しいバージョン ${data.tag_name} が公開されています(現在: v${app.getVersion()})`,
+      detail: 'リポジトリのReleasesページからダウンロードできます。',
+      buttons: ['リポジトリを開く', '閉じる'],
+      defaultId: 0,
+      cancelId: 1,
+    });
+    if (result.response === 0) {
+      shell.openExternal(RELEASES_URL);
+    }
+  } catch {
+    // 起動時チェックはネットワーク不通等でも黙って無視する
+  }
+}
 
 function rebuildPatchIndex() {
   patchIndex.clear();
@@ -36,6 +77,9 @@ function createWindow() {
     },
   });
   mainWindow.loadFile(path.join(__dirname, 'renderer', 'index.html'));
+  mainWindow.webContents.once('did-finish-load', () => {
+    checkForUpdateOnStartup();
+  });
 }
 
 app.whenReady().then(createWindow);
