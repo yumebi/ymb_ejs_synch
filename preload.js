@@ -12,6 +12,5 @@ contextBridge.exposeInMainWorld('appInfo', {
   // sandbox化されたpreloadではローカルファイルのrequireが使えないため、
   // バージョンはIPC経由でメインプロセス(app.getVersion())から取得する
   getVersion: () => ipcRenderer.invoke('get-version'),
-  // GitHub公開後、"owner/repo" 形式で設定すると更新確認が動くようになる
-  updateRepo: '',
+  updateRepo: 'yumebi/ymb_ejs_synch',
 });
