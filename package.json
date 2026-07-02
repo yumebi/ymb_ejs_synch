@@ -1,7 +1,7 @@
 {
   "name": "ejs-html-sync",
   "productName": "YMB EJS差分同期ツール",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "公開後に直接編集されたHTMLの差分をEJSソースへ反映するツール",
   "main": "main.js",
   "private": true,
