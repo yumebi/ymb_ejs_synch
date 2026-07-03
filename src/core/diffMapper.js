@@ -1,4 +1,19 @@
-const { diffLines } = require('diff');
+const { diffLines, diffChars } = require('diff');
+
+// charDiffを付与すると重くなる/描画が崩れるほど巨大な差分は対象外にする閾値(バイト数の目安として文字数で判定)
+const CHAR_DIFF_MAX_TOTAL_LENGTH = 10 * 1024;
+
+// oldHtml/newHtmlの文字単位差分を求める。合計が大きすぎる場合は負荷回避のためnullを返す。
+function computeCharDiff(oldHtml, newHtml) {
+  const oldStr = oldHtml || '';
+  const newStr = newHtml || '';
+  if (oldStr.length + newStr.length > CHAR_DIFF_MAX_TOTAL_LENGTH) return null;
+  return diffChars(oldStr, newStr).map((part) => ({
+    value: part.value,
+    added: !!part.added,
+    removed: !!part.removed,
+  }));
+}
 
 // removed側とadded側に共通する先頭/末尾を取り除き、実際に変化した中心部分だけを残す。
 // これをやらないと、同じ行に空文字を出すだけの動的タグ(<%- path %> 等)が混在するだけで
@@ -74,6 +89,8 @@ function computePatches(baselineHtml, segments, deployedHtml) {
     const newText = deployedHtml.slice(op.newStart, op.newEnd);
     const seg = findContaining(sorted, op.oldStart, op.oldEnd);
 
+    const charDiff = computeCharDiff(oldText, newText);
+
     if (seg) {
       const localStart = op.oldStart - seg.outputStart;
       const localEnd = op.oldEnd - seg.outputStart;
@@ -86,12 +103,13 @@ function computePatches(baselineHtml, segments, deployedHtml) {
         newText,
         oldHtml: oldText,
         newHtml: newText,
+        charDiff,
       });
     } else {
       const reason = op.oldStart === op.oldEnd
         ? '動的部分の近くへの挿入のため自動判定不可'
         : '変更範囲が動的部分(include/式埋め込み等)に重なるため自動判定不可';
-      patches.push({ confidence: 'review', reason, oldHtml: oldText, newHtml: newText });
+      patches.push({ confidence: 'review', reason, oldHtml: oldText, newHtml: newText, charDiff });
     }
   }
 

@@ -13,20 +13,37 @@
       <button id="pickEjsRoot">選択…</button>
     </div>
     <div class="field">
+      <label>公開HTML取得元</label>
+      <select id="htmlSource">
+        <option value="local">ローカルフォルダ</option>
+        <option value="url">URLから取得</option>
+      </select>
+    </div>
+    <div class="field" id="htmlRootField">
       <label>公開HTMLルート</label>
       <input id="htmlRoot" type="text" placeholder="例: C:\projects\sample-site\dist">
       <button id="pickHtmlRoot">選択…</button>
+    </div>
+    <div class="field" id="baseUrlField" hidden>
+      <label>公開サーバーURL</label>
+      <input id="baseUrl" type="text" placeholder="例: https://www.example.com/site">
+    </div>
+    <div class="field" id="basicAuthField" hidden>
+      <label>Basic認証(必要な場合のみ)</label>
+      <input id="basicUser" type="text" placeholder="ユーザー名">
+      <input id="basicPass" type="password" placeholder="パスワード">
     </div>
     <div class="field">
       <label>対象サブディレクトリ(空欄=全体)</label>
       <input id="scope" type="text" placeholder="ABOUT">
     </div>
     <button id="runScan" class="primary">スキャン実行</button>
+    <button id="applyAllPagesBtn" disabled>差分ページ全部に自動反映を一括適用</button>
     <span id="scanStatus" class="status"></span>
   </header>
 
   <main class="layout">
-    <section class="page-list">
+    <section class="page-list" id="pageList">
       <table>
         <thead>
           <tr><th>ページ</th><th>状態</th><th>自動</th><th>要レビュー</th></tr>
@@ -34,6 +51,8 @@
         <tbody id="pageListBody"></tbody>
       </table>
     </section>
+
+    <div class="splitter" id="splitter" title="ドラッグで幅を調整(ダブルクリックでリセット)"></div>
 
     <section class="detail" id="detail">
       <p class="placeholder">左の一覧からページを選択してください。</p>

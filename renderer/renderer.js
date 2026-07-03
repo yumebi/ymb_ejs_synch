@@ -54,6 +54,84 @@ el('checkUpdateBtn').addEventListener('click', async () => {
   }
 });
 
+// --- 左一覧の幅をドラッグで可変に ---
+const LIST_WIDTH_KEY = 'ejs-html-sync-list-width';
+const LIST_WIDTH_DEFAULT = 420;
+const LIST_WIDTH_MIN = 240;
+function clampListWidth(width) {
+  const max = Math.max(LIST_WIDTH_MIN, window.innerWidth - 400);
+  return Math.min(Math.max(width, LIST_WIDTH_MIN), max);
+}
+function setListWidth(width) {
+  el('pageList').style.width = `${clampListWidth(width)}px`;
+}
+function restoreListWidth() {
+  const saved = parseInt(localStorage.getItem(LIST_WIDTH_KEY), 10);
+  setListWidth(Number.isFinite(saved) && saved > 0 ? saved : LIST_WIDTH_DEFAULT);
+}
+restoreListWidth();
+
+(() => {
+  const splitter = el('splitter');
+  let dragging = false;
+
+  splitter.addEventListener('mousedown', (e) => {
+    dragging = true;
+    splitter.classList.add('dragging');
+    document.body.style.userSelect = 'none';
+    e.preventDefault();
+  });
+
+  document.addEventListener('mousemove', (e) => {
+    if (!dragging) return;
+    const listRect = el('pageList').getBoundingClientRect();
+    setListWidth(e.clientX - listRect.left);
+  });
+
+  document.addEventListener('mouseup', () => {
+    if (!dragging) return;
+    dragging = false;
+    splitter.classList.remove('dragging');
+    document.body.style.userSelect = '';
+    const width = parseInt(el('pageList').style.width, 10);
+    if (Number.isFinite(width)) localStorage.setItem(LIST_WIDTH_KEY, String(width));
+  });
+
+  splitter.addEventListener('dblclick', () => {
+    setListWidth(LIST_WIDTH_DEFAULT);
+    localStorage.setItem(LIST_WIDTH_KEY, String(LIST_WIDTH_DEFAULT));
+  });
+})();
+
+// --- 入力パスの記憶(EJSルート/公開HTMLルート/対象サブディレクトリ/取得元切替/URL) ---
+const PATHS_KEY = 'ejs-html-sync-paths';
+function restorePaths() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(PATHS_KEY) || '{}');
+    if (saved.ejsRoot) el('ejsRoot').value = saved.ejsRoot;
+    if (saved.htmlRoot) el('htmlRoot').value = saved.htmlRoot;
+    if (saved.scope) el('scope').value = saved.scope;
+    if (saved.htmlSource) el('htmlSource').value = saved.htmlSource;
+    if (saved.baseUrl) el('baseUrl').value = saved.baseUrl;
+    if (saved.basicUser) el('basicUser').value = saved.basicUser;
+    // basicPassは平文保存を避けるため復元しない(セッション中の入力のみ有効)
+  } catch {
+    // 保存値が壊れている場合は無視して初期状態のまま
+  }
+}
+function savePaths(ejsRoot, htmlRoot, scope) {
+  localStorage.setItem(PATHS_KEY, JSON.stringify({
+    ejsRoot,
+    htmlRoot,
+    scope,
+    htmlSource: el('htmlSource').value,
+    baseUrl: el('baseUrl').value.trim(),
+    basicUser: el('basicUser').value.trim(),
+    // basicPassは絶対に保存しない(平文保存を避ける)
+  }));
+}
+restorePaths();
+
 el('pickEjsRoot').addEventListener('click', async () => {
   const p = await window.api.selectFolder(el('ejsRoot').value);
   if (p) el('ejsRoot').value = p;
@@ -63,24 +141,105 @@ el('pickHtmlRoot').addEventListener('click', async () => {
   if (p) el('htmlRoot').value = p;
 });
 
+// --- 公開HTML取得元切替(ローカルフォルダ / URLから取得) ---
+function updateHtmlSourceUI() {
+  const isUrl = el('htmlSource').value === 'url';
+  el('htmlRootField').hidden = isUrl;
+  el('baseUrlField').hidden = !isUrl;
+  el('basicAuthField').hidden = !isUrl;
+}
+el('htmlSource').addEventListener('change', updateHtmlSourceUI);
+updateHtmlSourceUI();
+
+function updateApplyAllPagesBtn() {
+  const btn = el('applyAllPagesBtn');
+  const diffCount = state.pages.filter((p) => p.status === 'diff').length;
+  btn.disabled = diffCount === 0;
+}
+
 el('runScan').addEventListener('click', async () => {
   const ejsRoot = el('ejsRoot').value.trim();
   const htmlRoot = el('htmlRoot').value.trim();
+  const baseUrl = el('baseUrl').value.trim();
   const scope = el('scope').value.trim();
-  if (!ejsRoot || !htmlRoot) {
-    el('scanStatus').textContent = 'EJSルートと公開HTMLルートを指定してください';
+  const basicUser = el('basicUser').value.trim();
+  const basicPass = el('basicPass').value;
+  const isUrlMode = el('htmlSource').value === 'url';
+
+  if (!ejsRoot || (isUrlMode ? !baseUrl : !htmlRoot)) {
+    el('scanStatus').textContent = isUrlMode
+      ? 'EJSルートと公開サーバーURLを指定してください'
+      : 'EJSルートと公開HTMLルートを指定してください';
     return;
   }
-  el('scanStatus').textContent = 'スキャン中…';
+
+  el('scanStatus').textContent = isUrlMode ? '公開HTMLを取得中…' : 'スキャン中…';
   try {
-    const pages = await window.api.scan({ ejsRoot, htmlRoot, scope });
-    state.pages = pages;
-    state.selected = null;
-    renderPageList();
-    renderDetail(null);
-    el('scanStatus').textContent = `完了: ${pages.length}ページ`;
+    if (isUrlMode) {
+      const res = await window.api.scanRemote({ ejsRoot, baseUrl, scope, basicUser, basicPass });
+      savePaths(ejsRoot, htmlRoot, scope);
+      if (!res.ok) {
+        el('scanStatus').textContent = `エラー: ${res.error}`;
+        return;
+      }
+      state.pages = res.pages;
+      state.selected = null;
+      renderPageList();
+      renderDetail(null);
+      updateApplyAllPagesBtn();
+
+      const { fetchSummary } = res;
+      if (fetchSummary.failCount > 0) {
+        const authNote = fetchSummary.authFailed
+          ? ' / 取得失敗: Basic認証エラーの可能性(ID/パスワードを確認)'
+          : '';
+        el('scanStatus').textContent = `完了: ${res.pages.length}ページ(取得失敗${fetchSummary.failCount}件)${authNote}`;
+        console.warn('公開HTML取得に失敗したページ:', fetchSummary.failures);
+      } else {
+        el('scanStatus').textContent = `完了: ${res.pages.length}ページ`;
+      }
+    } else {
+      const pages = await window.api.scan({ ejsRoot, htmlRoot, scope });
+      savePaths(ejsRoot, htmlRoot, scope);
+      state.pages = pages;
+      state.selected = null;
+      renderPageList();
+      renderDetail(null);
+      updateApplyAllPagesBtn();
+      el('scanStatus').textContent = `完了: ${pages.length}ページ`;
+    }
   } catch (e) {
     el('scanStatus').textContent = `エラー: ${e.message}`;
+  }
+});
+
+el('applyAllPagesBtn').addEventListener('click', async () => {
+  const diffCount = state.pages.filter((p) => p.status === 'diff').length;
+  if (diffCount === 0) return;
+  if (!window.confirm(`差分のある${diffCount}ページに自動反映可能なパッチを一括適用します。よろしいですか?`)) {
+    return;
+  }
+  el('scanStatus').textContent = '一括適用中…';
+  try {
+    const res = await window.api.applyAllPages();
+    if (!res.ok) {
+      el('scanStatus').textContent = `一括適用エラー: ${res.error || ''}`;
+      return;
+    }
+    state.pages = res.pages;
+    renderPageList();
+    updateApplyAllPagesBtn();
+
+    const appliedTotal = res.summary.reduce((sum, s) => sum + s.appliedCount, 0);
+    const failedTotal = res.summary.reduce((sum, s) => sum + s.failedCount, 0);
+    el('scanStatus').textContent = `一括適用完了: ${res.summary.length}ページ / 適用${appliedTotal}件 / 失敗${failedTotal}件`;
+
+    if (state.selected) {
+      const selectedPage = state.pages.find((p) => p.relPath === state.selected);
+      if (selectedPage) renderDetail(selectedPage);
+    }
+  } catch (e) {
+    el('scanStatus').textContent = `一括適用エラー: ${e.message}`;
   }
 });
 
@@ -140,7 +299,7 @@ function renderDetail(page) {
     return;
   }
   if (page.status === 'identical') {
-    detail.innerHTML = `<h2>${escapeForDisplay(page.relPath)}</h2><p>EJSと公開HTMLに差分はありません。</p>`;
+    detail.innerHTML = `<h2>${escapeForDisplay(page.relPath)}</h2><div id="verifyResult"></div><p>EJSと公開HTMLに差分はありません。</p>`;
     return;
   }
 
@@ -149,6 +308,7 @@ function renderDetail(page) {
 
   detail.innerHTML = `
     <h2>${escapeForDisplay(page.relPath)}</h2>
+    <div id="verifyResult"></div>
     <div class="path-pair">
       <div class="path-box html">
         <div class="path-label">公開HTML(クライアント編集後)</div>
@@ -160,6 +320,7 @@ function renderDetail(page) {
         <div class="path-label">EJSソース(反映先)</div>
         <div class="path-value">${escapeForDisplay(page.ejsPath)}</div>
         <button class="openBtn" data-path="${escapeForDisplay(page.ejsPath)}">フォルダを開く</button>
+        <button id="restoreBackupBtn">バックアップから復元</button>
       </div>
     </div>
     <div class="actions">
@@ -183,11 +344,55 @@ function renderDetail(page) {
       if (!card) continue;
       markCardResult(card, r);
     }
+    applyUpdatedPage(res.updatedPage);
+  });
+
+  el('restoreBackupBtn').addEventListener('click', async () => {
+    if (!window.confirm(`${page.relPath} をバックアップ(.bak)から復元します。適用済みのパッチは取り消されます。よろしいですか?`)) {
+      return;
+    }
+    const res = await window.api.restoreBackup(page.relPath);
+    if (!res.ok) {
+      alert(`復元失敗: ${res.error}`);
+      return;
+    }
+    applyUpdatedPage(res.updatedPage);
+    renderDetail(res.updatedPage);
+    const verifyEl = el('verifyResult');
+    if (verifyEl) {
+      verifyEl.innerHTML = `<p class="verify-ok">復元完了: ${res.restoredFiles.length} ファイル</p>`;
+    }
   });
 
   const list = el('patchList');
   for (const patch of [...autoPatches, ...reviewPatches]) {
     list.appendChild(renderPatchCard(patch));
+  }
+}
+
+// パッチ適用後の再検証結果(updatedPage)をページ一覧・詳細パネル上部へ反映する。
+// 詳細パネル全体は再描画しない(レビュー中の他カードが消えてしまうため)。
+function applyUpdatedPage(updatedPage) {
+  if (!updatedPage) return;
+
+  const idx = state.pages.findIndex((p) => p.relPath === updatedPage.relPath);
+  if (idx !== -1) {
+    state.pages[idx] = updatedPage;
+  } else {
+    state.pages.push(updatedPage);
+  }
+  renderPageList();
+  updateApplyAllPagesBtn();
+
+  if (state.selected !== updatedPage.relPath) return;
+  const verifyEl = el('verifyResult');
+  if (!verifyEl) return;
+  if (updatedPage.status === 'identical') {
+    verifyEl.innerHTML = '<p class="verify-ok">適用済み・再ビルド結果は公開HTMLと完全一致</p>';
+  } else if (updatedPage.status === 'diff') {
+    verifyEl.innerHTML = `<p class="verify-remain">適用済み・残り差分 auto=${updatedPage.autoCount} / review=${updatedPage.reviewCount} 件</p>`;
+  } else {
+    verifyEl.innerHTML = '';
   }
 }
 
@@ -201,6 +406,25 @@ function markCardResult(card, result) {
   card.querySelectorAll('button').forEach((b) => (b.disabled = true));
 }
 
+// charDiff([{value, added, removed}, ...])から、公開HTML側(removedを保持しaddedを強調)
+// またはEJS側(addedを保持しremovedを強調)いずれかの表示用HTML文字列を組み立てる。
+// escapeForDisplayでエスケープした後の文字列だけを連結するため、値そのものにHTMLタグは混入しない。
+function buildCharDiffHtml(charDiff, side) {
+  let out = '';
+  for (const part of charDiff) {
+    if (side === 'deployed') {
+      // 公開HTML側: EJSへの反映で消える(removed)分は表示せず、追加分(added)を強調
+      if (part.removed) continue;
+      out += part.added ? `<span class="diff-add">${escapeForDisplay(part.value)}</span>` : escapeForDisplay(part.value);
+    } else {
+      // EJS側: 公開HTML側にしかない(added)分は表示せず、削除される分(removed)を強調
+      if (part.added) continue;
+      out += part.removed ? `<span class="diff-del">${escapeForDisplay(part.value)}</span>` : escapeForDisplay(part.value);
+    }
+  }
+  return out;
+}
+
 function renderPatchCard(patch) {
   const card = document.createElement('div');
   card.className = `patch-card ${patch.confidence}`;
@@ -210,6 +434,9 @@ function renderPatchCard(patch) {
   const fileLine = patch.file ? `<div class="reason">${escapeForDisplay(patch.file)}${patch.srcStart != null ? ` (位置 ${patch.srcStart}-${patch.srcEnd})` : ''}</div>` : '';
   const reasonLine = patch.reason ? `<div class="reason">${escapeForDisplay(patch.reason)}</div>` : '';
 
+  const newHtmlDisplay = patch.charDiff ? buildCharDiffHtml(patch.charDiff, 'deployed') : escapeForDisplay(patch.newHtml || '');
+  const oldHtmlDisplay = patch.charDiff ? buildCharDiffHtml(patch.charDiff, 'ejs') : escapeForDisplay(patch.oldHtml || '');
+
   card.innerHTML = `
     <div class="tag">${tagLabel}</div>
     ${fileLine}
@@ -217,17 +444,18 @@ function renderPatchCard(patch) {
     <div class="diff-cols">
       <div class="diff-col">
         <div class="diff-col-label">公開HTML(編集後)</div>
-        <pre class="new">${escapeForDisplay(patch.newHtml || '')}</pre>
+        <pre class="new">${newHtmlDisplay}</pre>
       </div>
       <div class="diff-arrow" title="左の内容をEJSへ書き込みます">EJSへ →</div>
       <div class="diff-col">
         <div class="diff-col-label">EJS(現状/反映前)</div>
-        <pre class="old">${escapeForDisplay(patch.oldHtml || '')}</pre>
+        <pre class="old">${oldHtmlDisplay}</pre>
       </div>
     </div>
     ${patch.confidence === 'review' && patch.file ? `<textarea class="editBox">${escapeForDisplay(patch.newText || patch.newHtml || '')}</textarea>` : ''}
     <div class="row-actions">
       ${patch.file ? '<button class="applyBtn">適用</button>' : ''}
+      ${patch.file ? '<button class="editorBtn">エディタで開く</button>' : ''}
       <button class="skipBtn">スキップ</button>
       <span class="result"></span>
     </div>
@@ -240,6 +468,14 @@ function renderPatchCard(patch) {
       const editedNewText = editBox ? editBox.value : undefined;
       const res = await window.api.applyPatch(patch.id, patch.confidence === 'review' ? editedNewText : undefined);
       markCardResult(card, res.ok ? { ok: true } : { ok: false, error: res.error });
+      if (res.ok) applyUpdatedPage(res.updatedPage);
+    });
+  }
+  const editorBtn = card.querySelector('.editorBtn');
+  if (editorBtn) {
+    editorBtn.addEventListener('click', async () => {
+      const res = await window.api.openInEditor(patch.file, patch.srcStart);
+      if (!res.ok) alert(`エディタで開けませんでした: ${res.error || ''}`);
     });
   }
   card.querySelector('.skipBtn').addEventListener('click', () => {

@@ -26,6 +26,38 @@ function toHtmlPath(ejsPath, ejsRoot, htmlRoot) {
   return path.join(htmlRoot, relHtml);
 }
 
+// EJS1ファイル分のスキャンを行う。scanAllからも、パッチ適用後の再検証(main.js)からも使う。
+function scanPage(ejsPath, htmlPath, relPath) {
+  if (!fs.existsSync(htmlPath)) {
+    return { relPath, ejsPath, htmlPath, status: 'missing-html' };
+  }
+
+  try {
+    const chunks = parser.parseAndExpand(ejsPath);
+    const { html, segments } = renderer.render(chunks, {});
+    const deployedHtml = fs.readFileSync(htmlPath, 'utf8');
+
+    if (html === deployedHtml) {
+      return { relPath, ejsPath, htmlPath, status: 'identical' };
+    }
+
+    const rawPatches = diffMapper.computePatches(html, segments, deployedHtml);
+    const patches = rawPatches.map((p, i) => ({ ...p, id: `${relPath}::${i}` }));
+
+    return {
+      relPath,
+      ejsPath,
+      htmlPath,
+      status: 'diff',
+      autoCount: patches.filter((p) => p.confidence === 'auto').length,
+      reviewCount: patches.filter((p) => p.confidence === 'review').length,
+      patches,
+    };
+  } catch (e) {
+    return { relPath, ejsPath, htmlPath, status: 'error', error: e.message };
+  }
+}
+
 function scanAll({ ejsRoot, htmlRoot, scope }) {
   const startDir = scope ? path.join(ejsRoot, scope) : ejsRoot;
   if (!fs.existsSync(startDir)) {
@@ -37,40 +69,10 @@ function scanAll({ ejsRoot, htmlRoot, scope }) {
   for (const ejsPath of ejsFiles) {
     const htmlPath = toHtmlPath(ejsPath, ejsRoot, htmlRoot);
     const relPath = path.relative(ejsRoot, ejsPath);
-
-    if (!fs.existsSync(htmlPath)) {
-      pages.push({ relPath, ejsPath, htmlPath, status: 'missing-html' });
-      continue;
-    }
-
-    try {
-      const chunks = parser.parseAndExpand(ejsPath);
-      const { html, segments } = renderer.render(chunks, {});
-      const deployedHtml = fs.readFileSync(htmlPath, 'utf8');
-
-      if (html === deployedHtml) {
-        pages.push({ relPath, ejsPath, htmlPath, status: 'identical' });
-        continue;
-      }
-
-      const rawPatches = diffMapper.computePatches(html, segments, deployedHtml);
-      const patches = rawPatches.map((p, i) => ({ ...p, id: `${relPath}::${i}` }));
-
-      pages.push({
-        relPath,
-        ejsPath,
-        htmlPath,
-        status: 'diff',
-        autoCount: patches.filter((p) => p.confidence === 'auto').length,
-        reviewCount: patches.filter((p) => p.confidence === 'review').length,
-        patches,
-      });
-    } catch (e) {
-      pages.push({ relPath, ejsPath, htmlPath, status: 'error', error: e.message });
-    }
+    pages.push(scanPage(ejsPath, htmlPath, relPath));
   }
 
   return pages;
 }
 
-module.exports = { scanAll, walkEjsFiles, toHtmlPath };
+module.exports = { scanAll, scanPage, walkEjsFiles, toHtmlPath };
