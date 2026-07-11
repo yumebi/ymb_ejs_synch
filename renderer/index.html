@@ -37,6 +37,12 @@
       <label>対象サブディレクトリ(空欄=全体)</label>
       <input id="scope" type="text" placeholder="ABOUT">
     </div>
+    <div class="field" id="crawlField" hidden>
+      <label class="checkbox-label">
+        <input type="checkbox" id="crawlToggle" checked>
+        リンクを辿って新規ページを探す
+      </label>
+    </div>
     <button id="runScan" class="primary">スキャン実行</button>
     <button id="applyAllPagesBtn" disabled>差分ページ全部に自動反映を一括適用</button>
     <span id="scanStatus" class="status"></span>

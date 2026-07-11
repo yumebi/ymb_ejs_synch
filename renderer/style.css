@@ -90,6 +90,16 @@ body {
 .toolbar button.primary { background: var(--accent); border-color: var(--accent); font-weight: bold; }
 .toolbar button.primary:hover { background: var(--accent-hover); }
 .status { color: #ffd166; font-size: 12px; }
+.toolbar .checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--toolbar-label);
+  font-size: 12px;
+  padding-bottom: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+}
 
 .layout { flex: 1; display: flex; min-height: 0; }
 .page-list {
@@ -123,6 +133,8 @@ body.dark .page-list tr.selected { background: #3a1e24; }
 .badge.diff { background: #fff2cc; color: #8a6d00; }
 .badge.error { background: #fde0e0; color: #a40000; }
 .badge.missing { background: #eee; color: #777; }
+.badge.html-only { background: #ffe0b3; color: #8a4b00; font-weight: bold; }
+body.dark .badge.html-only { background: #4a3410; color: #ffcf80; }
 .count.auto { color: var(--good); font-weight: bold; }
 .count.review { color: var(--accent); font-weight: bold; }
 
@@ -165,6 +177,13 @@ body.dark .page-list tr.selected { background: #3a1e24; }
 
 .verify-ok { color: var(--good); font-weight: bold; font-size: 12px; }
 .verify-remain { color: var(--accent); font-weight: bold; font-size: 12px; }
+.html-only-notice {
+  background: var(--pre-bg);
+  border-left: 4px solid #cc8400;
+  padding: 8px 10px;
+  border-radius: 4px;
+  margin-bottom: 14px;
+}
 
 .appbar {
   display: flex;

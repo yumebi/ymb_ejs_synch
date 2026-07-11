@@ -113,15 +113,17 @@ ipcMain.handle('scan', async (_evt, { ejsRoot, htmlRoot, scope }) => {
 
 // 公開サーバーから直接HTMLを取得してスキャンする。
 // 取得先はOS一時ディレクトリ配下の固定フォルダで、実行のたびに作り直す(古い結果の混入防止)。
-ipcMain.handle('scan-remote', async (_evt, { ejsRoot, baseUrl, scope, basicUser, basicPass }) => {
+ipcMain.handle('scan-remote', async (_evt, { ejsRoot, baseUrl, scope, basicUser, basicPass, crawl, crawlLimit }) => {
   const destDir = path.join(app.getPath('temp'), 'ejs-html-sync-remote');
   try {
     fs.rmSync(destDir, { recursive: true, force: true });
     fs.mkdirSync(destDir, { recursive: true });
 
     // basicUser/basicPassは認証情報のためログ等には一切出力しない
-    const fetchResult = await remoteFetcher.fetchSite({ ejsRoot, scope, baseUrl, destDir, basicUser, basicPass });
+    const fetchResult = await remoteFetcher.fetchSite({ ejsRoot, scope, baseUrl, destDir, basicUser, basicPass, crawl, crawlLimit });
 
+    // fetchSiteがdestDir配下へ保存した「EJS由来に無い新規ページ」は、
+    // scanAllの新規ページ検出(html-only)がそのまま拾う(destDirをhtmlRoot扱いにするため)。
     lastPages = scanner.scanAll({ ejsRoot, htmlRoot: destDir, scope });
     lastScanParams = { ejsRoot, htmlRoot: destDir, scope };
     rebuildPatchIndex();
@@ -138,6 +140,8 @@ ipcMain.handle('scan-remote', async (_evt, { ejsRoot, baseUrl, scope, basicUser,
         failCount: fetchResult.failCount,
         failures,
         authFailed: fetchResult.authFailed,
+        newPageCount: fetchResult.newPageCount,
+        note: fetchResult.note,
       },
     };
   } catch (e) {

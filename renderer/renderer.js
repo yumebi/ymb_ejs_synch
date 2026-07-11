@@ -147,9 +147,21 @@ function updateHtmlSourceUI() {
   el('htmlRootField').hidden = isUrl;
   el('baseUrlField').hidden = !isUrl;
   el('basicAuthField').hidden = !isUrl;
+  el('crawlField').hidden = !isUrl;
 }
 el('htmlSource').addEventListener('change', updateHtmlSourceUI);
 updateHtmlSourceUI();
+
+// --- URLモード: リンククロールでの新規ページ探索ON/OFF(既定ON) ---
+const CRAWL_KEY = 'ejs-html-sync-crawl';
+function restoreCrawlToggle() {
+  const saved = localStorage.getItem(CRAWL_KEY);
+  el('crawlToggle').checked = saved === null ? true : saved === 'true';
+}
+restoreCrawlToggle();
+el('crawlToggle').addEventListener('change', (e) => {
+  localStorage.setItem(CRAWL_KEY, e.target.checked ? 'true' : 'false');
+});
 
 function updateApplyAllPagesBtn() {
   const btn = el('applyAllPagesBtn');
@@ -176,7 +188,8 @@ el('runScan').addEventListener('click', async () => {
   el('scanStatus').textContent = isUrlMode ? '公開HTMLを取得中…' : 'スキャン中…';
   try {
     if (isUrlMode) {
-      const res = await window.api.scanRemote({ ejsRoot, baseUrl, scope, basicUser, basicPass });
+      const crawl = el('crawlToggle').checked;
+      const res = await window.api.scanRemote({ ejsRoot, baseUrl, scope, basicUser, basicPass, crawl });
       savePaths(ejsRoot, htmlRoot, scope);
       if (!res.ok) {
         el('scanStatus').textContent = `エラー: ${res.error}`;
@@ -189,14 +202,19 @@ el('runScan').addEventListener('click', async () => {
       updateApplyAllPagesBtn();
 
       const { fetchSummary } = res;
+      const parts = [`完了: ${res.pages.length}ページ`];
+      if (fetchSummary.newPageCount) parts.push(`新規${fetchSummary.newPageCount}件`);
+      if (fetchSummary.failCount > 0) parts.push(`取得失敗${fetchSummary.failCount}件`);
+      let statusMsg = parts.join(' / ');
+      if (fetchSummary.authFailed) {
+        statusMsg += ' / 取得失敗: Basic認証エラーの可能性(ID/パスワードを確認)';
+      }
+      if (fetchSummary.note) {
+        statusMsg += ` ${fetchSummary.note}`;
+      }
+      el('scanStatus').textContent = statusMsg;
       if (fetchSummary.failCount > 0) {
-        const authNote = fetchSummary.authFailed
-          ? ' / 取得失敗: Basic認証エラーの可能性(ID/パスワードを確認)'
-          : '';
-        el('scanStatus').textContent = `完了: ${res.pages.length}ページ(取得失敗${fetchSummary.failCount}件)${authNote}`;
         console.warn('公開HTML取得に失敗したページ:', fetchSummary.failures);
-      } else {
-        el('scanStatus').textContent = `完了: ${res.pages.length}ページ`;
       }
     } else {
       const pages = await window.api.scan({ ejsRoot, htmlRoot, scope });
@@ -206,7 +224,8 @@ el('runScan').addEventListener('click', async () => {
       renderPageList();
       renderDetail(null);
       updateApplyAllPagesBtn();
-      el('scanStatus').textContent = `完了: ${pages.length}ページ`;
+      const htmlOnlyCount = pages.filter((p) => p.status === 'html-only').length;
+      el('scanStatus').textContent = `完了: ${pages.length}ページ${htmlOnlyCount ? ` / 新規${htmlOnlyCount}件` : ''}`;
     }
   } catch (e) {
     el('scanStatus').textContent = `エラー: ${e.message}`;
@@ -247,6 +266,7 @@ function statusBadge(page) {
   if (page.status === 'identical') return '<span class="badge identical">差分なし</span>';
   if (page.status === 'missing-html') return '<span class="badge missing">公開HTML無し</span>';
   if (page.status === 'error') return '<span class="badge error">解析失敗</span>';
+  if (page.status === 'html-only') return '<span class="badge html-only">新規(EJS無し)</span>';
   return '<span class="badge diff">差分あり</span>';
 }
 
@@ -296,6 +316,21 @@ function renderDetail(page) {
   }
   if (page.status === 'error') {
     detail.innerHTML = `<h2>${escapeForDisplay(page.relPath)}</h2><p class="failed">解析エラー: ${escapeForDisplay(page.error)}</p>`;
+    return;
+  }
+  if (page.status === 'html-only') {
+    detail.innerHTML = `
+      <h2>${escapeForDisplay(page.relPath)}</h2>
+      <p class="html-only-notice">このページに対応するEJSソースがありません。クライアントが本番に直接追加した新規ページの可能性があります。EJS化が必要か確認してください。</p>
+      <div class="path-box html">
+        <div class="path-label">公開HTML</div>
+        <div class="path-value">${escapeForDisplay(page.htmlPath)}</div>
+        <button class="openBtn" data-path="${escapeForDisplay(page.htmlPath)}">フォルダを開く</button>
+      </div>
+    `;
+    detail.querySelectorAll('.openBtn').forEach((btn) => {
+      btn.addEventListener('click', () => window.api.openPath(btn.dataset.path));
+    });
     return;
   }
   if (page.status === 'identical') {
