@@ -42,7 +42,7 @@ npm start
 
 | 用途 | ライブラリ/ツール |
 |---|---|
-| フレームワーク | [Electron](https://www.electronjs.org/) v42 |
+| フレームワーク | [Electron](https://www.electronjs.org/) v43 |
 | 差分計算 | [diff](https://github.com/kpdecker/jsdiff) |
 | ビルドツール | [electron-builder](https://www.electron.build/) v26 |
 | CI/CD | GitHub Actions |
