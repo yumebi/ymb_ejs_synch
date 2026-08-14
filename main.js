@@ -242,6 +242,12 @@ ipcMain.handle('open-in-editor', async (_evt, { file, srcStart }) => {
   if (!fs.existsSync(file)) {
     return { ok: false, error: 'ファイルが見つかりません' };
   }
+  // shell経由でcode(.cmd)を起動するため、シェルメタ文字を含むパスは拒否する。
+  // コマンドインジェクションの防止。EJSソースはディレクトリ名/ファイル名に
+  // これらの文字を使う運用を想定していない。
+  if (/[\x00-\x1f&|<>^%!"]/.test(file)) {
+    return { ok: false, error: 'サポートされない文字を含むパスです' };
+  }
 
   let line = 1;
   try {
@@ -253,7 +259,8 @@ ipcMain.handle('open-in-editor', async (_evt, { file, srcStart }) => {
 
   return new Promise((resolve) => {
     try {
-      // Windowsでは code は .cmd のため shell 経由での実行が必要
+      // Windowsでは code は .cmd のため shell 経由での実行が必要。
+      // パスはメタ文字チェック済みなので、そのまま引数として渡す。
       const child = spawn('code', ['-g', `${file}:${line}`], { shell: true });
       let settled = false;
       const fallback = (error) => {
