@@ -28,6 +28,22 @@ function isNewer(a, b) {
   return false;
 }
 
+// Windows の VS Code インストール本体 (Code.exe) を探す。
+// 見つかればシェル不要で直接起動できるため、コマンドインジェクションを防げる。
+function resolveVscodeExecutable() {
+  if (process.platform !== 'win32') return null;
+  const roots = [
+    process.env.LOCALAPPDATA,
+    process.env.ProgramFiles,
+    process.env['ProgramFiles(x86)']
+  ].filter(Boolean);
+  for (const root of roots) {
+    const exe = path.join(root, 'Programs', 'Microsoft VS Code', 'Code.exe');
+    if (fs.existsSync(exe)) return exe;
+  }
+  return null;
+}
+
 async function checkForUpdateOnStartup() {
   try {
     const res = await fetch(`https://api.github.com/repos/${UPDATE_REPO}/releases/latest`);
@@ -259,9 +275,13 @@ ipcMain.handle('open-in-editor', async (_evt, { file, srcStart }) => {
 
   return new Promise((resolve) => {
     try {
-      // Windowsでは code は .cmd のため shell 経由での実行が必要。
-      // パスはメタ文字チェック済みなので、そのまま引数として渡す。
-      const child = spawn('code', ['-g', `${file}:${line}`], { shell: true });
+      // Windowsでは code は .cmd のため、通常はインストール本体(Code.exe)を
+      // 探してシェルを介さずに起動する(コマンドインジェクションを防ぐ)。
+      // Code.exe が見つからない場合のみ code(.cmd) をシェル経由で起動する。
+      const exe = resolveVscodeExecutable();
+      const useShell = process.platform === 'win32' && !exe;
+      const cmd = exe || 'code';
+      const child = spawn(cmd, ['-g', `${file}:${line}`], { shell: useShell });
       let settled = false;
       const fallback = (error) => {
         if (settled) return;
