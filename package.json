@@ -17,7 +17,8 @@
     "build-icons": "node scripts/build-icons.js",
     "dist": "electron-builder",
     "dist:win": "electron-builder --win",
-    "dist:mac": "electron-builder --mac"
+    "dist:mac": "electron-builder --mac",
+    "test": "node --test \"test/*.test.js\""
   },
   "dependencies": {
     "diff": "^9.0.0"
@@ -36,6 +37,7 @@
     "files": [
       "main.js",
       "preload.js",
+      "lib/**/*",
       "renderer/**/*",
       "src/**/*",
       "package.json"
