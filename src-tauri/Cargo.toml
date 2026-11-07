@@ -1,6 +1,6 @@
 [package]
 name = "ymb-ejs-sync"
-version = "1.2.4"
+version = "1.2.5"
 description = "公開後に直接編集されたHTMLの差分をEJSソースへ反映するツール"
 authors = ["ymb"]
 edition = "2021"
