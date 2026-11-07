@@ -1,18 +1,10 @@
-const fs = require('fs');
-
-function ensureBackup(file) {
-  const bak = `${file}.bak`;
-  if (!fs.existsSync(bak)) {
-    fs.copyFileSync(file, bak);
-  }
-}
+import { errorMessage } from './relPath.js';
 
 // 単一パッチを実ファイルに適用する。安全のため適用直前に oldText が
 // まだそこにある事を確認してから書き込む(ズレていたら例外を投げて中断)。
-function applyOne(patch, overrideNewText) {
+async function applyOne(io, patch, overrideNewText) {
   const newText = overrideNewText !== undefined ? overrideNewText : patch.newText;
-  ensureBackup(patch.file);
-  const content = fs.readFileSync(patch.file, 'utf8');
+  const content = await io.readEjs(patch.fileRel);
   const current = content.slice(patch.srcStart, patch.srcEnd);
   if (current !== patch.oldText) {
     throw new Error(
@@ -20,30 +12,31 @@ function applyOne(patch, overrideNewText) {
     );
   }
   const next = content.slice(0, patch.srcStart) + newText + content.slice(patch.srcEnd);
-  fs.writeFileSync(patch.file, next, 'utf8');
+  // 初回だけ .bak を残して、原子的に書き換える(途中で落ちても、元のファイルは壊れない)
+  await io.writeEjs(patch.fileRel, next, true);
 }
 
 // 同一ファイルへの複数パッチは srcStart の降順で適用する。
 // 末尾側から書き換えれば、まだ書き換えていない手前側のオフセットは崩れない。
-function applyBatch(patches) {
+async function applyBatch(io, patches) {
   const byFile = new Map();
   for (const p of patches) {
-    if (!byFile.has(p.file)) byFile.set(p.file, []);
-    byFile.get(p.file).push(p);
+    if (!byFile.has(p.fileRel)) byFile.set(p.fileRel, []);
+    byFile.get(p.fileRel).push(p);
   }
   const results = [];
   for (const [file, list] of byFile) {
     list.sort((a, b) => b.srcStart - a.srcStart);
     for (const p of list) {
       try {
-        applyOne(p);
+        await applyOne(io, p);
         results.push({ patch: p, ok: true });
       } catch (e) {
-        results.push({ patch: p, ok: false, error: e.message });
+        results.push({ patch: p, ok: false, error: errorMessage(e) });
       }
     }
   }
   return results;
 }
 
-module.exports = { applyOne, applyBatch, ensureBackup };
+export { applyOne, applyBatch };

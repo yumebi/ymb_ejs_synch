@@ -3,8 +3,8 @@
   "productName": "YMB EJS差分同期ツール",
   "version": "1.2.3",
   "description": "公開後に直接編集されたHTMLの差分をEJSソースへ反映するツール",
-  "main": "main.js",
   "private": true,
+  "type": "module",
   "author": "ymb",
   "license": "MIT",
   "homepage": "https://github.com/yumebi/ymb_ejs_synch",
@@ -13,44 +13,16 @@
     "url": "https://github.com/yumebi/ymb_ejs_synch.git"
   },
   "scripts": {
-    "start": "electron .",
-    "build-icons": "node scripts/build-icons.js",
-    "dist": "electron-builder",
-    "dist:win": "electron-builder --win",
-    "dist:mac": "electron-builder --mac",
-    "test": "node --test \"test/*.test.js\""
+    "tauri": "tauri",
+    "vendor": "node scripts/vendor.mjs",
+    "dev": "tauri dev",
+    "build": "tauri build",
+    "test": "node scripts/vendor.mjs && node --test \"test/*.test.js\""
   },
   "dependencies": {
     "diff": "^9.0.0"
   },
   "devDependencies": {
-    "electron": "^44.9.3",
-    "electron-builder": "^26.17.0",
-    "png2icons": "^2.0.1",
-    "sharp": "^0.35.3"
-  },
-  "build": {
-    "appId": "com.ymb.ejs-html-sync",
-    "directories": {
-      "output": "dist"
-    },
-    "files": [
-      "main.js",
-      "preload.js",
-      "lib/**/*",
-      "renderer/**/*",
-      "src/**/*",
-      "package.json"
-    ],
-    "win": {
-      "target": "nsis"
-    },
-    "mac": {
-      "target": "dmg",
-      "category": "public.app-category.developer-tools"
-    },
-    "linux": {
-      "target": "AppImage"
-    }
+    "@tauri-apps/cli": "^2.12.3"
   }
 }

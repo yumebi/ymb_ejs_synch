@@ -1,4 +1,4 @@
-const { diffLines, diffChars } = require('diff');
+import { diffLines, diffChars } from '../vendor/diff/index.js';
 
 // charDiffを付与すると重くなる/描画が崩れるほど巨大な差分は対象外にする閾値(バイト数の目安として文字数で判定)
 const CHAR_DIFF_MAX_TOTAL_LENGTH = 10 * 1024;
@@ -116,4 +116,4 @@ function computePatches(baselineHtml, segments, deployedHtml) {
   return patches;
 }
 
-module.exports = { computePatches, computeRawOps };
+export { computePatches, computeRawOps };

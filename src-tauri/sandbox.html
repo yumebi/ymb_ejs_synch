@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>sandbox</title>
+</head>
+<body>
+<!-- EJS テンプレート(<% ... %> の JavaScript)を実行するための、隔離した枠。
+     専用の URI スキーム(ymbsandbox)から、専用の CSP つきで配信する(本体の画面には eval を許さないため)。
+     親からは sandbox 属性(別の出所)で開かれ、通信もできず、Tauri の機能にも触れない。 -->
+<script>
+(function () {
+  function escapeHtml(s) {
+    return String(s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+  window.addEventListener('message', function (e) {
+    var msg = e.data;
+    if (!msg || typeof msg.id !== 'number') return;
+    var buf = [];
+    var __push = function (s, idx) { buf.push({ s: String(s), idx: idx }); };
+    var fn;
+    try {
+      fn = new Function(...['__push', '__esc'].concat(msg.argNames).concat([msg.body]));
+    } catch (err) {
+      e.source.postMessage({ id: msg.id, error: 'EJSテンプレートのコンパイルに失敗: ' + err.message + '\n--- 生成コード ---\n' + msg.body }, '*');
+      return;
+    }
+    try {
+      fn.apply(null, [__push, escapeHtml].concat(msg.argValues));
+    } catch (err) {
+      e.source.postMessage({ id: msg.id, error: 'EJSテンプレートの実行に失敗: ' + err.message }, '*');
+      return;
+    }
+    e.source.postMessage({ id: msg.id, buf: buf }, '*');
+  });
+  window.parent.postMessage({ ready: true }, '*');
+})();
+</script>
+</body>
+</html>

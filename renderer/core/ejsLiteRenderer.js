@@ -32,30 +32,34 @@ function buildFunctionBody(chunks, segMeta) {
   return lines.join('\n');
 }
 
-function render(chunks, locals = {}) {
-  const segMeta = [];
-  const body = buildFunctionBody(chunks, segMeta);
-
+// 既定の実行器(Node のテスト用)。画面側では、隔離した枠(sandbox.html)の中で実行する実行器に差し替える。
+function runDirect(body, argNames, argValues) {
   const buf = [];
   const __push = (s, idx) => buf.push({ s, idx });
-  const __esc = escapeHtml;
-
-  const argNames = Object.keys(locals);
-  const argValues = argNames.map((k) => locals[k]);
-
   let fn;
   try {
     // eslint-disable-next-line no-new-func
     fn = new Function('__push', '__esc', ...argNames, body);
   } catch (e) {
-    throw new Error(`EJSテンプレートのコンパイルに失敗: ${e.message}\n--- 生成コード ---\n${body}`);
+    throw new Error(`EJSテンプレートのコンパイルに失敗: ${e.message}
+--- 生成コード ---
+${body}`);
   }
-
   try {
-    fn(__push, __esc, ...argValues);
+    fn(__push, escapeHtml, ...argValues);
   } catch (e) {
     throw new Error(`EJSテンプレートの実行に失敗: ${e.message}`);
   }
+  return buf;
+}
+
+async function render(chunks, locals = {}, run = runDirect) {
+  const segMeta = [];
+  const body = buildFunctionBody(chunks, segMeta);
+
+  const argNames = Object.keys(locals);
+  const argValues = argNames.map((k) => locals[k]);
+  const buf = await run(body, argNames, argValues);
 
   let pos = 0;
   let html = '';
@@ -80,4 +84,4 @@ function render(chunks, locals = {}) {
   return { html, segments };
 }
 
-module.exports = { render, escapeHtml };
+export { render, escapeHtml };

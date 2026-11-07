@@ -235,7 +235,7 @@ el('runScan').addEventListener('click', async () => {
 el('applyAllPagesBtn').addEventListener('click', async () => {
   const diffCount = state.pages.filter((p) => p.status === 'diff').length;
   if (diffCount === 0) return;
-  if (!window.confirm(`差分のある${diffCount}ページに自動反映可能なパッチを一括適用します。よろしいですか?`)) {
+  if (!(await window.ymbDialog.confirm(`差分のある${diffCount}ページに自動反映可能なパッチを一括適用します。よろしいですか?`))) {
     return;
   }
   el('scanStatus').textContent = '一括適用中…';
@@ -371,7 +371,7 @@ function renderDetail(page) {
   el('applyAllAutoBtn').addEventListener('click', async () => {
     const res = await window.api.applyAllAuto(page.relPath);
     if (!res.ok) {
-      alert(`適用失敗: ${res.error}`);
+      await window.ymbDialog.alert(`適用失敗: ${res.error}`);
       return;
     }
     for (const r of res.results) {
@@ -383,12 +383,12 @@ function renderDetail(page) {
   });
 
   el('restoreBackupBtn').addEventListener('click', async () => {
-    if (!window.confirm(`${page.relPath} をバックアップ(.bak)から復元します。適用済みのパッチは取り消されます。よろしいですか?`)) {
+    if (!(await window.ymbDialog.confirm(`${page.relPath} をバックアップ(.bak)から復元します。適用済みのパッチは取り消されます。よろしいですか?`))) {
       return;
     }
     const res = await window.api.restoreBackup(page.relPath);
     if (!res.ok) {
-      alert(`復元失敗: ${res.error}`);
+      await window.ymbDialog.alert(`復元失敗: ${res.error}`);
       return;
     }
     applyUpdatedPage(res.updatedPage);
@@ -510,7 +510,7 @@ function renderPatchCard(patch) {
   if (editorBtn) {
     editorBtn.addEventListener('click', async () => {
       const res = await window.api.openInEditor(patch.file, patch.srcStart);
-      if (!res.ok) alert(`エディタで開けませんでした: ${res.error || ''}`);
+      if (!res.ok) await window.ymbDialog.alert(`エディタで開けませんでした: ${res.error || ''}`);
     });
   }
   card.querySelector('.skipBtn').addEventListener('click', () => {

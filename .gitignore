@@ -4,3 +4,6 @@ out/
 *.log
 .claude/
 .codegraph/
+src-tauri/target/
+src-tauri/gen/
+renderer/vendor/

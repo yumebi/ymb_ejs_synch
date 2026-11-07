@@ -1,12 +1,13 @@
-const fs = require('fs');
-const path = require('path');
+import { dirname, extname, resolveFrom } from './relPath.js';
 
 // EJS(レガシー include 構文込み)を 静的リテラル / 出力タグ / スクリプトレット に分割する。
+// io.readEjs(相対パス)でファイルを読む(Tauri では Rust のコマンド、テストでは偽物)。
+// file は、EJS ルートからの相対パス(`/` 区切り)。
 // 各チャンクは file + srcStart + srcEnd (そのファイル内のバイト位置=文字位置) を持つ。
 const TAG_RE = /<%([-=#_]?)([\s\S]*?)([-_]?)%>/g;
 
-function parseFileToChunks(absPath) {
-  const text = fs.readFileSync(absPath, 'utf8');
+async function parseFileToChunks(io, absPath) {
+  const text = await io.readEjs(absPath);
   const chunks = [];
   let cursor = 0;
   let m;
@@ -67,28 +68,33 @@ function matchInclude(code) {
   return null;
 }
 
+// include の指す先を、EJS ルートからの相対パスで返す。ルートの外・絶対パスは、例外にする。
 function resolveIncludePath(baseFile, rawTarget) {
   let p = rawTarget;
-  if (!path.extname(p)) p += '.ejs';
-  return path.resolve(path.dirname(baseFile), p);
+  if (!extname(p)) p += '.ejs';
+  const resolved = resolveFrom(baseFile, p);
+  if (resolved === null) {
+    throw new Error(`include がEJSルートの外を指しているため読み込めません: ${rawTarget}(${baseFile})`);
+  }
+  return resolved;
 }
 
 // includeを再帰的に展開し、フラットなチャンク列を返す
-function parseAndExpand(absPath, seen = new Set()) {
-  const real = path.resolve(absPath);
+async function parseAndExpand(io, absPath, seen = new Set()) {
+  const real = absPath;
   if (seen.has(real)) {
     throw new Error(`include の循環参照を検出: ${real}`);
   }
   seen.add(real);
 
-  const rawChunks = parseFileToChunks(real);
+  const rawChunks = await parseFileToChunks(io, real);
   const expanded = [];
   for (const chunk of rawChunks) {
     if (chunk.type === 'tag' && chunk.tagType === 'output-raw') {
       const target = matchInclude(chunk.code);
       if (target) {
         const includedAbs = resolveIncludePath(real, target);
-        const nested = parseAndExpand(includedAbs, new Set(seen));
+        const nested = await parseAndExpand(io, includedAbs, new Set(seen));
         expanded.push(...nested);
         continue;
       }
@@ -98,4 +104,4 @@ function parseAndExpand(absPath, seen = new Set()) {
   return expanded;
 }
 
-module.exports = { parseFileToChunks, parseAndExpand, matchInclude, resolveIncludePath };
+export { parseFileToChunks, parseAndExpand, matchInclude, resolveIncludePath };
