@@ -31,3 +31,8 @@ reason = "zbus_names は Linux の D-Bus 連携用の内部依存。Windows 向�
 id = "RUSTSEC-2026-0372"
 ignoreUntil = 2026-12-31
 reason = "zvariant_derive は Linux の D-Bus 連携用の内部依存。Windows 向けの配布物には入らない。修正版なし"
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2026-0543"
+ignoreUntil = 2026-12-31
+reason = "chrono のメンテナンス終了の通知で、脆弱性ではない。Tauri などの依存で入るため、すぐには外せない。依存先が乗り換えるまで様子を見る。"
